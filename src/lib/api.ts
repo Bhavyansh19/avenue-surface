@@ -11,5 +11,5 @@ api.interceptors.response.use(
   res => res,
   err => Promise.reject(err)
 )
-
+console.log('API URL:', import.meta.env.VITE_API_URL)
 export default api
