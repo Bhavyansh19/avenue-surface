@@ -3,6 +3,8 @@ import { useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import Layout from './components/layout/Layout'
 import AdminLayout from './components/layout/AdminLayout'
+import AuthCallbackPage from './pages/AuthCallbackPage'
+
 
 import HomePage         from './pages/HomePage'
 import ShopPage         from './pages/ShopPage'
@@ -50,6 +52,7 @@ export default function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/"                   element={<HomePage />} />
+        
 
         {/* 🔥 FIX ADDED HERE */}
         <Route path="/products"           element={<ShopPage />} />
@@ -70,6 +73,7 @@ export default function App() {
         <Route path="/privacy"            element={<TermsPage />} />
         <Route path="/login"              element={<LoginPage />} />
         <Route path="/register"           element={<RegisterPage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
         <Route path="/checkout"           element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
         <Route path="/order-success/:id"  element={<ProtectedRoute><OrderSuccessPage /></ProtectedRoute>} />
         <Route path="/account"            element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
