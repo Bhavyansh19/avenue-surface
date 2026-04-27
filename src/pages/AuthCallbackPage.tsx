@@ -1,20 +1,22 @@
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// FILE: client/src/pages/AuthCallbackPage.tsx  (NEW FILE — create this)
-// PURPOSE: Google redirects here after login. We call /api/auth/me
-//          to load the user into Zustand, then go to homepage.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FILE: client/src/pages/AuthCallbackPage.tsx
+// Replace your existing AuthCallbackPage.tsx with this
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import toast from 'react-hot-toast'
+import api from '../lib/api'
 
 export default function AuthCallbackPage() {
   const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
-  const { fetchMe }    = useAuthStore()
+  const ran            = useRef(false)
 
   useEffect(() => {
+    // Prevent double-run in React StrictMode
+    if (ran.current) return
+    ran.current = true
+
     const error = searchParams.get('error')
 
     if (error) {
@@ -23,22 +25,40 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // Cookie is already set by backend — just fetch the user
-    fetchMe()
-      .then(() => {
-        toast.success('Signed in with Google!')
+    // Backend already set the httpOnly cookie.
+    // Call /me to get the user object, then manually hydrate Zustand.
+    api.get('/auth/me')
+      .then(res => {
+        const user = res.data.user
+        if (!user) throw new Error('No user')
+
+        // Write into Zustand persist storage in localStorage
+        try {
+          const raw     = localStorage.getItem('avenue-auth')
+          const parsed  = raw ? JSON.parse(raw) : {}
+          parsed.state  = { ...(parsed.state || {}), user }
+          localStorage.setItem('avenue-auth', JSON.stringify(parsed))
+        } catch {}
+
+        // Update live Zustand state directly
+        useAuthStore.setState({ user })
+
+        toast.success(`Welcome, ${user.firstName}!`)
         navigate('/')
       })
       .catch(() => {
-        toast.error('Something went wrong. Please try again.')
+        toast.error('Sign-in failed. Please try again.')
         navigate('/login')
       })
   }, [])
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-10 h-10 border-4 border-stone-200 border-t-terra rounded-full animate-spin" />
-      <p className="text-stone-500 text-sm">Signing you in…</p>
+      <div
+        className="w-10 h-10 border-4 border-stone-200 rounded-full animate-spin"
+        style={{ borderTopColor: '#C4622D' }}
+      />
+      <p className="text-stone-500 text-sm">Signing you in with Google…</p>
     </div>
   )
 }
