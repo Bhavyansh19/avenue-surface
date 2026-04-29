@@ -1,39 +1,29 @@
-// FILE: client/src/store/authStore.ts
-// Replace your entire authStore.ts with this
-// KEY FIX: fetchMe now properly updates the Zustand persisted state
-
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import api from '../lib/api'
 
 interface User {
-  _id: string
-  firstName: string
-  lastName: string
-  email: string
-  role: string
-  phone?: string
-  avatar?: string
-  addresses: any[]
-  wishlist: any[]
+  _id: string; firstName: string; lastName: string; email: string
+  role: string; phone?: string; avatar?: string; addresses: any[]; wishlist: any[]
 }
 
 interface AuthStore {
   user: User | null
-  loading: boolean
+  token: string | null
   login: (email: string, password: string) => Promise<void>
   register: (data: any) => Promise<void>
   logout: () => Promise<void>
   fetchMe: () => Promise<void>
+  setTokenAndFetch: (token: string) => Promise<void>
   updateProfile: (data: any) => Promise<void>
   toggleWishlist: (productId: string) => Promise<void>
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
-      user: null,
-      loading: false,
+    (set, get) => ({
+      user:  null,
+      token: null,
 
       login: async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password })
@@ -47,17 +37,29 @@ export const useAuthStore = create<AuthStore>()(
 
       logout: async () => {
         try { await api.post('/auth/logout') } catch {}
-        set({ user: null })
+        set({ user: null, token: null })
       },
 
-      // KEY FIX: always call /me fresh from server and update state
-      // This is used on app init AND after Google OAuth callback
       fetchMe: async () => {
         try {
           const { data } = await api.get('/auth/me')
           set({ user: data.user })
         } catch {
-          set({ user: null })
+          set({ user: null, token: null })
+        }
+      },
+
+      // Called by AuthCallbackPage after Google login
+      // Stores token, sets auth header, fetches user
+      setTokenAndFetch: async (token: string) => {
+        set({ token })
+        // Set default header so all future requests include the token
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        try {
+          const { data } = await api.get('/auth/me')
+          set({ user: data.user })
+        } catch {
+          set({ user: null, token: null })
         }
       },
 
@@ -73,8 +75,13 @@ export const useAuthStore = create<AuthStore>()(
     }),
     {
       name: 'avenue-auth',
-      // Only persist the user object — not loading state
-      partialize: (s) => ({ user: s.user }),
+      partialize: (s) => ({ user: s.user, token: s.token }),
+      // On rehydrate, restore the Authorization header if token exists
+      onRehydrateStorage: () => (state) => {
+        if (state?.token) {
+          api.defaults.headers.common['Authorization'] = `Bearer ${state.token}`
+        }
+      },
     }
   )
 )
